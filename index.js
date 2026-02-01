@@ -72,6 +72,7 @@ client.on("messageCreate", async (message) => {
 
   const args = message.content.slice(prefix.length).trim().split(/ +/);
   const command = args.shift().toLowerCase();
+
   const data = loadData();
   ensureGuild(data, message.guild.id);
 
@@ -80,14 +81,32 @@ client.on("messageCreate", async (message) => {
       .setColor("Red")
       .setDescription(text);
 
+  /* ===== ADD NOTIFY CHANNEL ===== */
+  if (command === "addchannel") {
+    data[message.guild.id].notifyChannel = message.channel.id;
+    saveData(data);
+
+    return message.reply({
+      embeds: [
+        embed(`✅ تم تعيين هذا الروم لإشعارات اليوتيوب\n📢 <#${message.channel.id}>`)
+      ]
+    });
+  }
+
+  /* ===== REMOVE NOTIFY CHANNEL ===== */
   if (command === "rchannel") {
     data[message.guild.id].notifyChannel = null;
     saveData(data);
     return message.reply({ embeds: [embed("❌ تم حذف روم الإشعارات")] });
   }
 
+  /* ===== ADD YOUTUBE CHANNEL ===== */
   if (command === "ytadd") {
-    if (!args[0]) return message.reply({ embeds: [embed("❌ حط ID القناة")] });
+    if (!args[0])
+      return message.reply({ embeds: [embed("❌ حط ID القناة")] });
+
+    if (data[message.guild.id].youtubeChannels.includes(args[0]))
+      return message.reply({ embeds: [embed("⚠️ القناة مضافة مسبقًا")] });
 
     data[message.guild.id].youtubeChannels.push(args[0]);
     data[message.guild.id].lastVideos[args[0]] = "WAIT";
@@ -96,10 +115,11 @@ client.on("messageCreate", async (message) => {
     return message.reply({ embeds: [embed("✅ تم إضافة القناة")] });
   }
 
+  /* ===== REMOVE YOUTUBE CHANNEL ===== */
   if (command === "ytremove") {
     if (!args[0])
       return message.reply({
-        embeds: [embed("❌ يجب أن تضع ID القناة\nمثال:\n`!ytremove UCxxxx`")]
+        embeds: [embed("❌ مثال:\n`!ytremove UCxxxx`")]
       });
 
     data[message.guild.id].youtubeChannels =
@@ -111,16 +131,20 @@ client.on("messageCreate", async (message) => {
     return message.reply({ embeds: [embed("❌ تم حذف القناة")] });
   }
 
+  /* ===== LIST CHANNELS ===== */
   if (command === "ytlist") {
     const list = data[message.guild.id].youtubeChannels;
     if (!list.length)
       return message.reply({ embeds: [embed("🚫 لا توجد قنوات")] });
 
     return message.reply({
-      embeds: [embed(list.map((c) => `https://youtube.com/channel/${c}`).join("\n"))]
+      embeds: [
+        embed(list.map((c) => `https://youtube.com/channel/${c}`).join("\n"))
+      ]
     });
   }
 
+  /* ===== CLEAR ALL ===== */
   if (command === "ytclear") {
     data[message.guild.id].youtubeChannels = [];
     data[message.guild.id].lastVideos = {};
@@ -128,6 +152,7 @@ client.on("messageCreate", async (message) => {
     return message.reply({ embeds: [embed("🧹 تم حذف كل القنوات")] });
   }
 
+  /* ===== RESTART ===== */
   if (command === "restart") {
     await message.reply({ embeds: [embed("♻️ جاري إعادة التشغيل...")] });
     process.exit(0);
@@ -165,24 +190,24 @@ function startYouTubeChecker() {
 
           const embed = new EmbedBuilder()
             .setColor("Red")
-            .setTitle("New Video 🔥")
+            .setTitle("🔥 New YouTube Video")
             .setDescription(latest.title)
             .setURL(latest.link)
             .setThumbnail(feed.image.url);
 
           const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
-              .setLabel("Subscribe")
+              .setLabel("▶️ Watch")
               .setStyle(ButtonStyle.Link)
               .setURL(latest.link),
             new ButtonBuilder()
-              .setLabel("Channel")
+              .setLabel("📺 Channel")
               .setStyle(ButtonStyle.Link)
               .setURL(`https://youtube.com/channel/${channelId}`)
           );
 
           const ch = await client.channels.fetch(g.notifyChannel);
-          ch.send({ embeds: [embed], components: [row] });
+          if (ch) ch.send({ embeds: [embed], components: [row] });
         } catch (e) {
           console.log("YT ERROR:", e.message);
         }
